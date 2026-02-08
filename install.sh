@@ -19,6 +19,58 @@ BLUE="$(tput setaf 4)"
 SKY_BLUE="$(tput setaf 6)"
 RESET="$(tput sgr0)"
 
+# CLI options
+INSTALL_MODE="${INSTALL_MODE:-ubuntu}"
+DO_DRY_RUN=0
+SHOW_HELP=0
+for arg in "$@"; do
+    case "$arg" in
+        --install-ppa)
+            INSTALL_MODE=ppa
+            ;;
+        --install-ubuntu)
+            INSTALL_MODE=ubuntu
+            ;;
+        --dry-run)
+            DO_DRY_RUN=1
+            ;;
+        -h|--help)
+            SHOW_HELP=1
+            ;;
+    esac
+done
+
+if [ "$SHOW_HELP" = "1" ]; then
+    cat <<USAGE
+Usage: ./install.sh [options]
+
+Options:
+  --install-ubuntu    Install Hyprland from Ubuntu repositories (default)
+  --install-ppa       Install Hyprland from the community PPA (if available)
+  --dry-run           Print what would be done and exit (non-interactive)
+  -h, --help          Show this help and exit
+
+Notes:
+- Ubuntu 26.04 (beta) currently has Hyprland 0.52.x in the official repos.
+- The PPA may not support 26.04 yet. Use --install-ppa only when support exists.
+USAGE
+    exit 0
+fi
+
+# Non-interactive dry-run exits early (before any prompts)
+if [ "$DO_DRY_RUN" = "1" ]; then
+    echo "[DRY-RUN] Hyprland install mode: $INSTALL_MODE"
+    case "$INSTALL_MODE" in
+        ubuntu)
+            echo "[DRY-RUN] Would run: install-scripts/hyprland-ppa.sh (Ubuntu repo path)"
+            ;;
+        ppa)
+            echo "[DRY-RUN] Would run: install-scripts/hyprland-ppa-enable.sh (enable PPA and install)"
+            ;;
+    esac
+    exit 0
+fi
+
 # Function to print colorful text
 print_color() {
     printf "%b%s%b\n" "$1" "$2" "$RESET"
@@ -69,6 +121,7 @@ export REPO_ROOT="$SCRIPT_DIR"
 : "${BUILD_BIN:=$BUILD_ROOT/bin}"
 export BUILD_ROOT BUILD_SRC BUILD_BIN
 mkdir -p "$BUILD_SRC" "$BUILD_BIN" "$REPO_ROOT/Install-Logs"
+
 
 # Check if running as root. If root, script will exit
 if [[ $EUID -eq 0 ]]; then
@@ -127,12 +180,6 @@ fi
 # Path to the install-scripts directory
 script_directory=install-scripts
 
-# Load centralized Hyprland stack tags if present and export for child scripts
-if [ -f "./hypr-tags.env" ]; then
-    # shellcheck disable=SC1091
-    source "./hypr-tags.env"
-    export HYPRLAND_TAG AQUAMARINE_TAG HYPRUTILS_TAG HYPRLANG_TAG HYPRGRAPHICS_TAG HYPRWAYLAND_SCANNER_TAG HYPRLAND_PROTOCOLS_TAG HYPRLAND_QT_SUPPORT_TAG HYPRLAND_QTUTILS_TAG WAYLAND_PROTOCOLS_TAG
-fi
 
 # Function to execute a script if it exists and make it executable
 execute_script() {
@@ -348,50 +395,23 @@ echo "${INFO} Installing ${SKY_BLUE}KooL Hyprland packages...${RESET}" | tee -a 
 sleep 1
 execute_script "01-hypr-pkgs.sh"
 
-# Default: install from PPA. Optional: build from source when requested.
-FROM_SOURCE=0
-if [ "${HYPR_FROM_SOURCE:-0}" = "1" ]; then
-    FROM_SOURCE=1
-else
-    for arg in "$@"; do
-        if [ "$arg" = "--from-source" ]; then
-            FROM_SOURCE=1
-            break
-        fi
-    done
-fi
-
-if [ "$FROM_SOURCE" -eq 1 ]; then
-    echo "${INFO} Building Hyprland ${SKY_BLUE}from source${RESET}..." | tee -a "$LOG"
-    # Build Hyprland stack prerequisites from source in correct order
-    sleep 1
-    execute_script "wayland-protocols-src.sh"
-    sleep 1
-    execute_script "hyprland-protocols.sh"
-    sleep 1
-    execute_script "hyprutils.sh"
-    sleep 1
-    execute_script "hyprlang.sh"
-    sleep 1
-    # Ensure scanner is available before building aquamarine (required by CMake find_package)
-    execute_script "hyprwayland-scanner.sh"
-    sleep 1
-    execute_script "aquamarine.sh"
-    sleep 1
-    execute_script "hyprgraphics.sh"
-    sleep 1
-    execute_script "hyprland-qt-support.sh"
-    sleep 1
-    execute_script "hyprland-qtutils.sh"
-
-    # Now build and install Hyprland itself
-    sleep 1
-    execute_script "hyprland.sh"
-else
+# Install Hyprland from Ubuntu repositories by default; optional PPA when requested
+case "$INSTALL_MODE" in
+  ubuntu)
     echo "${INFO} Installing Hyprland from ${SKY_BLUE}Ubuntu repositories${RESET}..." | tee -a "$LOG"
     sleep 1
     execute_script "hyprland-ppa.sh"
-fi
+    ;;
+  ppa)
+    echo "${INFO} Installing Hyprland from ${SKY_BLUE}community PPA${RESET} (if available)..." | tee -a "$LOG"
+    sleep 1
+    execute_script "hyprland-ppa-enable.sh"
+    ;;
+  *)
+    echo "${ERROR} Unknown install mode: $INSTALL_MODE" | tee -a "$LOG"
+    exit 1
+    ;;
+esac
 
 # Rest of the desktop stack
 sleep 1
