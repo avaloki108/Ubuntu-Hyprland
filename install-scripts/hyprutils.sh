@@ -18,19 +18,18 @@ fi
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
   echo "Failed to source Global_functions.sh"
   exit 1
 fi
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_hyprutils.log"
-MLOG="install-$(date +%d-%H%M%S)_hyprutils2.log"
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || { echo "${ERROR} Failed to change directory to $BUILD_SRC"; exit 1; }
+
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprutils.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprutils2.log"
 
 # Clean previous clone
 if [ -d "hyprutils" ]; then
@@ -52,7 +51,7 @@ if git clone -b "$tag" https://github.com/hyprwm/hyprutils.git; then
   else
     echo "${NOTE} DRY RUN: Skipping installation of hyprutils $tag."
   fi
-  [ -f "$MLOG" ] && mv "$MLOG" ../Install-Logs/ || true
+  [ -f "$MLOG" ] && mv "$MLOG" "$REPO_ROOT/Install-Logs/" || true
   cd ..
 else
   echo -e "${ERROR} Download failed for hyprutils" 2>&1 | tee -a "$LOG"

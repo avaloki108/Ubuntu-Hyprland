@@ -61,6 +61,15 @@ fi
 # Set the name of the log file to include the current date and time
 LOG="Install-Logs/01-Hyprland-Install-Scripts-$(date +%d-%H%M%S).log"
 
+# Initialize build directories under repo root so child scripts build in build/src and drop artifacts in build/bin
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export REPO_ROOT="$SCRIPT_DIR"
+: "${BUILD_ROOT:=$REPO_ROOT/build}"
+: "${BUILD_SRC:=$BUILD_ROOT/src}"
+: "${BUILD_BIN:=$BUILD_ROOT/bin}"
+export BUILD_ROOT BUILD_SRC BUILD_BIN
+mkdir -p "$BUILD_SRC" "$BUILD_BIN" "$REPO_ROOT/Install-Logs"
+
 # Check if running as root. If root, script will exit
 if [[ $EUID -eq 0 ]]; then
     echo "${ERROR}  This script should ${WARNING}NOT${RESET} be executed as root!! Exiting......." | tee -a "$LOG"

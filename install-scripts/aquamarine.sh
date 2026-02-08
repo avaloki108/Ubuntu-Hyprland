@@ -18,19 +18,18 @@ fi
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
   echo "Failed to source Global_functions.sh"
   exit 1
 fi
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_aquamarine.log"
-MLOG="install-$(date +%d-%H%M%S)_aquamarine2.log"
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || { echo "${ERROR} Failed to change directory to $BUILD_SRC"; exit 1; }
+
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_aquamarine.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_aquamarine2.log"
 
 # Prefer locally built hyprutils/hyprlang in /usr/local over distro packages
 export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:${PKG_CONFIG_PATH:-}"
@@ -56,7 +55,7 @@ if git clone --recursive -b "$tag" https://github.com/hyprwm/aquamarine.git; the
     else
         echo "${NOTE} DRY RUN: Skipping installation of aquamarine $tag."
     fi
-    [ -f "$MLOG" ] && mv "$MLOG" ../Install-Logs/ || true
+    [ -f "$MLOG" ] && mv "$MLOG" "$REPO_ROOT/Install-Logs/" || true
     cd ..
 else
     echo -e "${ERROR} Download failed for ${YELLOW}aquamarine $tag${RESET}" 2>&1 | tee -a "$LOG"

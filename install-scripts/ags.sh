@@ -38,19 +38,18 @@ ags_tag="v1.9.0"
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
   echo "Failed to source Global_functions.sh"
   exit 1
 fi
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_ags.log"
-MLOG="install-$(date +%d-%H%M%S)_ags2.log"
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || { echo "${ERROR} Failed to change directory to $BUILD_SRC"; exit 1; }
+
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_ags.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_ags2.log"
 
 # Check if AGS is installed
 if command -v ags &>/dev/null; then
@@ -202,12 +201,11 @@ WRAP
   else
     echo -e "\n${ERROR} ${YELLOW}Aylur's GTK shell $ags_tag${RESET} Installation failed\n " 2>&1 | tee -a "$MLOG"
    fi
-    # Move logs to Install-Logs directory
-    mv "$MLOG" ../Install-Logs/ || true
+    # Logs already written under $REPO_ROOT/Install-Logs
     cd ..
 else
     echo -e "\n${ERROR} Failed to download ${YELLOW}Aylur's GTK shell $ags_tag${RESET} Please check your connection\n" 2>&1 | tee -a "$LOG"
-    mv "$MLOG" ../Install-Logs/ || true
+    [ -f "$MLOG" ] && mv "$MLOG" "$REPO_ROOT/Install-Logs/" || true
     exit 1
 fi
 

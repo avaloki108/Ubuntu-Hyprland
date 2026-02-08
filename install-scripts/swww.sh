@@ -43,13 +43,12 @@ swww=(
 
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || { echo "${ERROR} Failed to change directory to $BUILD_SRC"; exit 1; }
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_swww.log"
-MLOG="install-$(date +%d-%H%M%S)_swww2.log"
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_swww.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_swww2.log"
 
 # Install build dependency
 printf "\n%s - Installing ${SKY_BLUE}swww $swww_tag and dependencies${RESET} .... \n" "${NOTE}"
@@ -96,8 +95,7 @@ sudo cp -r completions/swww.bash /usr/share/bash-completion/completions/swww 2>&
 sudo mkdir -p /usr/share/zsh/site-functions 2>&1 | tee -a "$MLOG"
 sudo cp -r completions/_swww /usr/share/zsh/site-functions/_swww 2>&1 | tee -a "$MLOG"
 
-# Move logs into main Install-Logs
-mv "$MLOG" ../Install-Logs/ || true
-cd - || exit 1
+# Logs already saved into $REPO_ROOT/Install-Logs
+cd "$REPO_ROOT" || exit 1
 
 printf "\n%.0s" {1..2}

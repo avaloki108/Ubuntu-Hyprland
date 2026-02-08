@@ -5,27 +5,26 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || {
-    echo "${ERROR} Failed to change directory to $PARENT_DIR"
-    exit 1
-}
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
     echo "Failed to source Global_functions.sh"
     exit 1
 fi
+# Operate from repo root for apt/logging; sources will clone under $BUILD_SRC
+cd "$REPO_ROOT" || {
+    echo "${ERROR} Failed to change directory to $REPO_ROOT"
+    exit 1
+}
 
 # Prefer /usr/local for pkg-config and CMake (for locally built libs like Breakpad)
 export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:${PKG_CONFIG_PATH:-}"
 export CMAKE_PREFIX_PATH="/usr/local:${CMAKE_PREFIX_PATH:-}"
 
-# Ensure logs dir exists at repo root (we cd into source later)
-mkdir -p "$PARENT_DIR/Install-Logs"
+# Ensure logs dir exists at repo root (provided by Global_functions)
+mkdir -p "$REPO_ROOT/Install-Logs"
 
-LOG="$PARENT_DIR/Install-Logs/install-$(date +%d-%H%M%S)_quickshell.log"
-MLOG="$PARENT_DIR/Install-Logs/install-$(date +%d-%H%M%S)_quickshell_build.log"
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_quickshell.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_quickshell_build.log"
 
 # Refresh sudo credentials once (install_package uses sudo internally)
 if command -v sudo >/dev/null 2>&1; then
@@ -102,7 +101,7 @@ done
 # Build Google Breakpad from source if pkg-config 'breakpad' is missing
 if ! pkg-config --exists breakpad; then
   note "Building Google Breakpad from source..."
-  BP_DIR="$PARENT_DIR/.thirdparty/breakpad"
+  BP_DIR="$BUILD_SRC/.thirdparty/breakpad"
   rm -rf "$BP_DIR"
   mkdir -p "$BP_DIR"
   (
@@ -151,7 +150,7 @@ PCEOF
 fi
 
 # Clone source (prefer upstream forgejo; mirror available at github:quickshell-mirror/quickshell)
-SRC_DIR="quickshell-src"
+SRC_DIR="$BUILD_SRC/quickshell-src"
 if [ -d "$SRC_DIR" ]; then
     note "Removing existing $SRC_DIR"
     rm -rf "$SRC_DIR"

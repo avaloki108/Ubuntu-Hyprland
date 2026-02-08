@@ -9,19 +9,18 @@ lang_tag="v0.6.4"
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
   echo "Failed to source Global_functions.sh"
   exit 1
 fi
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_hyprlang.log"
-MLOG="install-$(date +%d-%H%M%S)_hyprlang2.log"
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || { echo "${ERROR} Failed to change directory to $BUILD_SRC"; exit 1; }
+
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprlang.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprlang2.log"
 
 # Prefer locally built hyprutils in /usr/local
 export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:${PKG_CONFIG_PATH:-}"
@@ -46,8 +45,7 @@ if git clone --recursive -b $lang_tag https://github.com/hyprwm/hyprlang.git; th
     else
         echo -e "${ERROR} Installation failed for ${YELLOW}hyprlang $lang_tag${RESET}" 2>&1 | tee -a "$MLOG"
     fi
-    #moving the addional logs to Install-Logs directory
-    mv $MLOG ../Install-Logs/ || true 
+    [ -f "$MLOG" ] && mv "$MLOG" "$REPO_ROOT/Install-Logs/" || true
     cd ..
 else
     echo -e "${ERROR} Download failed for ${YELLOW}hyprlang $lang_tag${RESET}" 2>&1 | tee -a "$LOG"

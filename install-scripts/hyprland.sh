@@ -27,19 +27,18 @@ hyprland_extra_deps=(
 # Determine the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Change the working directory to the parent directory of the script
-PARENT_DIR="$SCRIPT_DIR/.."
-cd "$PARENT_DIR" || exit 1
-
-# Source the global functions script
+# Source the global functions script (provides REPO_ROOT/BUILD_SRC)
 if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
   echo "Failed to source Global_functions.sh"
   exit 1
 fi
 
-# Set the name of the log file to include the current date and time
-LOG="Install-Logs/install-$(date +%d-%H%M%S)_hyprland.log"
-MLOG="install-$(date +%d-%H%M%S)_hyprland2.log"
+# Work in build/src to keep repo root clean
+cd "$BUILD_SRC" || exit 1
+
+# Set the name of the log file to include the current date and time (under repo root)
+LOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprland.log"
+MLOG="$REPO_ROOT/Install-Logs/install-$(date +%d-%H%M%S)_hyprland2.log"
 
 # Installation of additional dependencies (if available)
 printf "\n%s - Installing hyprland additional dependencies.... \n" "${NOTE}"
@@ -81,9 +80,9 @@ if git clone --recursive -b "$tag" "https://github.com/hyprwm/Hyprland"; then
   cd "Hyprland" || exit 1
 
   # Apply optional patch if present and applicable
-  if [ -f ../assets/0001-fix-hyprland-compile-issue.patch ]; then
-    if patch -p1 --dry-run < ../assets/0001-fix-hyprland-compile-issue.patch >/dev/null 2>&1; then
-      patch -p1 < ../assets/0001-fix-hyprland-compile-issue.patch
+  if [ -f "$REPO_ROOT/assets/0001-fix-hyprland-compile-issue.patch" ]; then
+    if patch -p1 --dry-run < "$REPO_ROOT/assets/0001-fix-hyprland-compile-issue.patch" >/dev/null 2>&1; then
+      patch -p1 < "$REPO_ROOT/assets/0001-fix-hyprland-compile-issue.patch"
     else
       echo "${NOTE} Hyprland compile patch does not apply on $tag; skipping."
     fi
@@ -127,7 +126,7 @@ if git clone --recursive -b "$tag" "https://github.com/hyprwm/Hyprland"; then
   else
     echo "${NOTE} DRY RUN: Skipping installation of Hyprland $tag."
   fi
-  [ -f "$MLOG" ] && mv "$MLOG" ../Install-Logs/ || true
+  [ -f "$MLOG" ] && mv "$MLOG" "$REPO_ROOT/Install-Logs/" || true
   cd ..
 else
   echo -e "${ERROR} Download failed for ${YELLOW}Hyprland $tag${RESET}" 2>&1 | tee -a "$LOG"
