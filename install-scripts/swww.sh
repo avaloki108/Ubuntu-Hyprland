@@ -1,25 +1,38 @@
 #!/bin/bash
 # 💫 https://github.com/JaKooLit 💫 #
 # SWWW - Wallpaper Utility #
+set -euo pipefail
 
-# Check if 'swww' is installed
+# Pin to last supported release
+swww_tag="v0.11.2"
+swww_min="0.11.2"
+
+# Version compare helper (dpkg preferred; fallback to sort -V)
+version_ge() {
+  local a="$1" b="$2"
+  if command -v dpkg >/dev/null 2>&1; then
+    dpkg --compare-versions "$a" ge "$b"
+    return $?
+  fi
+  [ "$(printf '%s\n%s\n' "$b" "$a" | sort -V | tail -n1)" = "$a" ]
+}
+
+# Check if 'swww' is installed and sufficient
 if command -v swww &>/dev/null; then
-    SWWW_VERSION=$(swww -V | awk '{print $NF}')
-    if [[ "$SWWW_VERSION" == "0.9.5" ]]; then
-        echo -e "${OK} ${MAGENTA}swww v0.9.5${RESET} is already installed. Skipping installation."
-        exit 0
-    fi
+  SWWW_VERSION=$(swww --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+){1,3}' | head -1)
+  if [ -n "$SWWW_VERSION" ] && version_ge "$SWWW_VERSION" "$swww_min"; then
+    echo -e "${OK} ${MAGENTA}swww ${SWWW_VERSION}${RESET} detected (>= ${swww_min}). Skipping installation."
+    exit 0
+  else
+    echo -e "${INFO} swww ${SWWW_VERSION:-unknown} found; upgrading to ${swww_tag}."
+  fi
 else
-    echo -e "${NOTE} ${MAGENTA}swww${RESET} is not installed. Proceeding with installation."
+  echo -e "${NOTE} ${MAGENTA}swww${RESET} is not installed. Proceeding with installation."
 fi
 
-
 swww=(
-    liblz4-dev
+  liblz4-dev
 )
-
-# specific branch or release
-swww_tag="v0.9.5"
 
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -38,61 +51,53 @@ fi
 LOG="Install-Logs/install-$(date +%d-%H%M%S)_swww.log"
 MLOG="install-$(date +%d-%H%M%S)_swww2.log"
 
-# Installation of swww compilation needed
+# Install build dependency
 printf "\n%s - Installing ${SKY_BLUE}swww $swww_tag and dependencies${RESET} .... \n" "${NOTE}"
-
 for PKG1 in "${swww[@]}"; do
-    install_package "$PKG1" "$LOG"
+  install_package "$PKG1" "$LOG"
 done
 
 printf "\n%.0s" {1..2}
 
-# Check if swww directory exists
+# Fetch sources at exact tag
 if [ -d "swww" ]; then
-    cd swww || exit 1
-    git pull origin main 2>&1 | tee -a "$MLOG"
+  cd swww || exit 1
+  git fetch --tags --force 2>&1 | tee -a "$MLOG"
+  git checkout -f "$swww_tag" 2>&1 | tee -a "$MLOG"
+  git reset --hard "$swww_tag" 2>&1 | tee -a "$MLOG"
 else
-    if git clone --recursive -b $swww_tag https://github.com/LGFae/swww.git; then
-        cd swww || exit 1
-    else
-        echo -e "${ERROR} Download failed for ${YELLOW}swww $swww_tag${RESET}" 2>&1 | tee -a "$LOG"
-        exit 1
-    fi
+  if git clone --recursive -b "$swww_tag" https://github.com/LGFae/swww.git; then
+    cd swww || exit 1
+  else
+    echo -e "${ERROR} Download failed for ${YELLOW}swww $swww_tag${RESET}" 2>&1 | tee -a "$LOG"
+    exit 1
+  fi
 fi
 
-# Proceed with the rest of the installation steps
+# Build
 source "$HOME/.cargo/env" || true
-
 cargo build --release 2>&1 | tee -a "$MLOG"
 
-# Checking if swww is previously installed and delete before copying
-file1="/usr/bin/swww"
-file2="/usr/bin/swww-daemon"
+# Remove any old distro-installed copies to avoid path confusion
+for f in /usr/bin/swww /usr/bin/swww-daemon; do
+  if [ -f "$f" ]; then
+    sudo rm -f "$f"
+  fi
+done
 
-# Check if file1 exists and delete if so
-if [ -f "$file1" ]; then
-    sudo rm -r "$file1"
-fi
+# Install locally built binaries under /usr/local/bin
+sudo install -m 0755 target/release/swww /usr/local/bin/swww 2>&1 | tee -a "$MLOG"
+sudo install -m 0755 target/release/swww-daemon /usr/local/bin/swww-daemon 2>&1 | tee -a "$MLOG"
 
-# Check if file2 exists and delete if so
-if [ -f "$file2" ]; then
-    sudo rm -r "$file2"
-fi
+# Shell completions
+sudo mkdir -p /usr/share/bash-completion/completions 2>&1 | tee -a "$MLOG"
+sudo cp -r completions/swww.bash /usr/share/bash-completion/completions/swww 2>&1 | tee -a "$MLOG"
 
-# Copy binaries to /usr/bin/
-sudo cp -r target/release/swww /usr/bin/ 2>&1 | tee -a "$MLOG" 
-sudo cp -r target/release/swww-daemon /usr/bin/ 2>&1 | tee -a "$MLOG" 
+sudo mkdir -p /usr/share/zsh/site-functions 2>&1 | tee -a "$MLOG"
+sudo cp -r completions/_swww /usr/share/zsh/site-functions/_swww 2>&1 | tee -a "$MLOG"
 
-# Copy bash completions
-sudo mkdir -p /usr/share/bash-completion/completions 2>&1 | tee -a "$MLOG" 
-sudo cp -r completions/swww.bash /usr/share/bash-completion/completions/swww 2>&1 | tee -a "$MLOG" 
-
-# Copy zsh completions
-sudo mkdir -p /usr/share/zsh/site-functions 2>&1 | tee -a "$MLOG" 
-sudo cp -r completions/_swww /usr/share/zsh/site-functions/_swww 2>&1 | tee -a "$MLOG" 
-
-# Moving logs into main Install-Logs
-mv "$MLOG" ../Install-Logs/ || true 
+# Move logs into main Install-Logs
+mv "$MLOG" ../Install-Logs/ || true
 cd - || exit 1
 
 printf "\n%.0s" {1..2}
