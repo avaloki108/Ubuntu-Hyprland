@@ -1,10 +1,10 @@
 #!/bin/bash
 # 💫 https://github.com/JaKooLit 💫 #
 # wallust - pywal colors replacement #
+set -euo pipefail
 
-wallust=(
-  wallust
-)
+# Optional pin. If empty, any installed version is accepted and we skip.
+WALLUST_VERSION_TARGET="${WALLUST_VERSION:-}"
 
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -25,40 +25,36 @@ LOG="Install-Logs/install-$(date +%d-%H%M%S)_wallust.log"
 # Create log directory if it doesn't exist
 mkdir -p "$(dirname "$LOG")"
 
-# Install up-to-date Rust
-echo "${INFO} Installing most ${YELLOW}up to date Rust compiler${RESET} ..."
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>&1 | tee -a "$LOG"
-source "$HOME/.cargo/env"
-
-printf "\n%.0s" {1..2} 
-
-# Remove any existing Wallust binary
-if [[ -f "/usr/local/bin/wallust" ]]; then
-    echo "Removing existing Wallust binary..." 2>&1 | tee -a "$LOG"
-    sudo rm "/usr/local/bin/wallust" 
-fi
-
-printf "\n%.0s" {1..2} 
-
-# Install Wallust using Cargo
-for WALL in "${wallust[@]}"; do
-    cargo_install "$WALL" "$LOG"
-    if [ $? -eq 0 ]; then  
-        echo "${OK} ${MAGENTA}Wallust${RESET} installed successfully." | tee -a "$LOG"
-    else
-        echo "${ERROR} Installation of ${MAGENTA}$WALL${RESET} failed. Check the log file $LOG for details." | tee -a "$LOG"
-        exit 1
-    fi
-done
-printf "\n%.0s" {1..1} 
-# Move the newly compiled binary to /usr/local/bin
-echo "Moving Wallust binary to /usr/local/bin..." | tee -a "$LOG"
-if sudo mv "$HOME/.cargo/bin/wallust" /usr/local/bin 2>&1 | tee -a "$LOG"; then
-    echo "${OK} Wallust binary moved successfully to /usr/local/bin." | tee -a "$LOG"
+# Ensure Cargo exists; install Rust only if missing
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "${INFO} Installing ${YELLOW}Rust toolchain (cargo)${RESET} ..." | tee -a "$LOG"
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal 2>&1 | tee -a "$LOG"
+  source "$HOME/.cargo/env"
 else
-    echo "${ERROR} Failed to move Wallust binary. Check the log file $LOG for details." | tee -a "$LOG"
-    exit 1
+  source "$HOME/.cargo/env" || true
 fi
 
+printf "\n%.0s" {1..1}
+
+# If wallust already installed and (optionally) matches target, skip
+if command -v wallust >/dev/null 2>&1; then
+  cur_ver="$(wallust --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+){1,3}' | head -1 || true)"
+  if [ -z "$WALLUST_VERSION_TARGET" ] || [ "$cur_ver" = "$WALLUST_VERSION_TARGET" ]; then
+    echo "${OK} wallust ${cur_ver:-unknown} already installed. Skipping." | tee -a "$LOG"
+    exit 0
+  fi
+  echo "${INFO} Updating wallust from ${cur_ver:-unknown} -> ${WALLUST_VERSION_TARGET}" | tee -a "$LOG"
+fi
+
+# Install/upgrade Wallust using Cargo (cargo will update if already installed)
+echo "${INFO} Installing ${MAGENTA}wallust${RESET} via cargo ..." | tee -a "$LOG"
+cargo install wallust --locked 2>&1 | tee -a "$LOG"
+
+# Place the binary under /usr/local/bin (preferred for locally built tools)
+echo "Installing wallust to /usr/local/bin ..." | tee -a "$LOG"
+sudo install -m 0755 "$HOME/.cargo/bin/wallust" /usr/local/bin/wallust 2>&1 | tee -a "$LOG"
+
+echo "${OK} wallust installation complete." | tee -a "$LOG"
 
 printf "\n%.0s" {1..2}
